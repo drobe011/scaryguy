@@ -4,11 +4,15 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <avr/sleep.h>
+#include <avr/wdt.h>
+#include <stdlib.h>
 //#include <avr/iotn84a.h>
 
 #define LOW_DUTY 20
 #define HIGH_DUTY 220
-#define DELY_TICKS 50
+#define DELY_TICKS_MIN 20
+#define DELY_TICKS_MAX 100 - DELY_TICKS_MIN
+#define DELY_TICKS_STARTUP_DISPLAY 50
 #define FDIR 0
 #define CHEK 1
 #define DELY 2
@@ -23,7 +27,13 @@ __inline void setupTimer0()
 }
 
 __inline void setupMisc() { PRR = _BV(PRUSI); }
-__inline void configPins() { DDRA |= _BV(DDA5) | _BV(DDA6); }
+__inline void configPins()
+{
+    DDRA |= _BV(DDA5) | _BV(DDA6);
+    DIDR0 = 0b11111111;
+    PORTB |= _BV(PORTB0) | _BV(PORTB1) | _BV(PORTB2);
+}
+
 __inline void setPinsLow() { PORTA &= ~_BV(PORTA5) | ~_BV(PORTA6); }
 
 __inline void setupLEDPWM()
@@ -65,6 +75,8 @@ __inline void acIRQ_Off()
     ACSR |= _BV(ACI);
 }
 
+__inline void acDisable() { ACSR &= ~_BV(ACIE); ACSR |= _BV(ACD); }
+__inline void acEnable() { ACSR &= ~_BV(ACIE) | ~_BV(ACD); }
 __inline void acIRQ_On() { ACSR |= _BV(ACIE); }
 __inline uint8_t isItDay() { return (ACSR & _BV(ACO)); }
 __inline void set_ctcFlag() { GPIOR0 |= _BV(CHEK); }
@@ -75,13 +87,12 @@ __inline void setFadeOut() { GPIOR0 &= ~_BV(FDIR); }
 __inline uint8_t isFadeIn() { return (GPIOR0 & _BV(FDIR)); }
 __inline void incDuty() { OCR1A++; OCR1B++; }
 __inline void decDuty() { OCR1A--; OCR1B--; }
-__inline void setDely() { GPIOR0 |= _BV(DELY); }
-__inline void clrDely() { GPIOR0 &= ~_BV(DELY); }
-__inline uint8_t isDely() { return (GPIOR0 & _BV(DELY)); }
+__inline void setDelay() { GPIOR0 |= _BV(DELY); GPIOR1 = 0; }
+__inline void clrDelay() { GPIOR0 &= ~_BV(DELY); }
+__inline uint8_t isDelay() { return (GPIOR0 & _BV(DELY)); }
 
 void goToSleep();
 void nothing();
-
-void (*state)();
-
+void delayNflash(uint8_t, uint8_t, uint8_t);
+void stateChangeDisplay(uint8_t);
 #endif // DEFS_H_INCLUDED
