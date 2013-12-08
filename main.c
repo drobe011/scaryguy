@@ -5,15 +5,15 @@
 
 uint8_t mcusr_mirror __attribute__ ((section (".noinit")));
 
-    void get_mcusr(void) \
-      __attribute__((naked)) \
-      __attribute__((section(".init3")));
-    void get_mcusr(void)
-    {
-      mcusr_mirror = MCUSR;
-      MCUSR = 0;
-      wdt_disable();
-    }
+void get_mcusr(void) \
+  __attribute__((naked)) \
+  __attribute__((section(".init3")));
+void get_mcusr(void)
+{
+  mcusr_mirror = MCUSR;
+  MCUSR = 0;
+  wdt_disable();
+}
 
 int main(void)
 {
@@ -32,19 +32,19 @@ int main(void)
 
     sei();
 
-    stateChangeDisplay(DELY_TICKS_STARTUP_DISPLAY);
+    stateChangeDisplay(DELAY_TICKS_STARTUP_DISPLAY);
 
     while(1)
     {
         if (is_ctcFlag())
         {
             wdt_reset();
-            acEnable(); //TURN ON AC OPERATION
-            GPIOR2 = (rand() / ((RAND_MAX / DELY_TICKS_MAX + 1)) + DELY_TICKS_MIN); //GENERATE AND STORE RANDOM PAUSE BETWEEN FADE OUT/IN
+            comparEnable(); //TURN ON AC OPERATION
+            setMode((GPIOR2 < DELAY_TICKS_MIN + 5) ? BLINK_MODE : PWM_MODE);
             cli();
             state = (isItDay()) ? &goToSleep : &nothing;    //TEST FOR TWO STATES: NOTHINNG OR TIME TO SLEEP BECAUSE IT'S DAYTIME
             state();
-            acDisable();  //TURN OFF AC UNTIL NEXT CTC ON TIMER0
+            comparDisable();  //TURN OFF AC UNTIL NEXT CTC ON TIMER0
         }
     }
     return 0;
@@ -57,13 +57,13 @@ void goToSleep()
     shutOffLEDPWM();
     shutOffTimer0();
     setPinsLow();
-    acIRQ_On();
+    comparIRQ_On();
     sleep_enable();
     sei();
     sleep_cpu();
     //WAKEUP AND START EVERYTHING BACK UP
     sleep_disable();
-    acIRQ_Off();
+    comparIRQ_Off();
     setupLEDPWM();
     setupTimer0();
     wdt_enable(WDTO_120MS);
@@ -97,7 +97,7 @@ void stateChangeDisplay(uint8_t delayTime)
 
 ISR(ANA_COMP_vect)
 {
-    acIRQ_Off();
+    comparIRQ_Off();
 }
 
 ISR(TIM0_COMPA_vect)
@@ -108,19 +108,23 @@ ISR(TIM0_COMPA_vect)
         if (GPIOR1 >= GPIOR2) clrDelay();
         else GPIOR1++;
     }
-    else if (isFadeIn())
+    else if (isPWM())
     {
-        if (OCR1A < HIGH_DUTY) incDuty();
-        else setFadeOut();
-    }
-    else
-    {
-        if (OCR1A > LOW_DUTY) decDuty();
+        if (isFadeIn())
+        {
+            if (OCR1A < HIGH_DUTY) incDuty();
+            else setFadeOut();
+        }
         else
         {
-            setFadeIn();
-            setDelay();
-            OCR1A = OCR1B = 0;
+            if (OCR1A > LOW_DUTY) decDuty();
+            else
+            {
+                GPIOR2 = (rand() / ((RAND_MAX / DELAY_TICKS_MAX + 1)) + DELAY_TICKS_MIN); //GENERATE AND STORE RANDOM PAUSE BETWEEN FADE OUT/IN
+                setFadeIn();
+                setDelay();
+                OCR1A = OCR1B = 0;
+            }
         }
     }
 }
