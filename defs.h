@@ -65,7 +65,7 @@ __inline uint8_t isPWM() { return !(GPIOR0 & _BV(MODE)); }
 
 __inline void setupADC()
 {
-    ACSR |= _BV(ACIE) | _BV(ACIS0) | _BV(ACIS1);
+    ACSR |= _BV(ACIE); // | _BV(ACIS1) | _BV(ACIS1);
     DIDR0 = _BV(ADC1D) | _BV(ADC2D);
 }
 
@@ -75,10 +75,10 @@ __inline void comparIRQ_Off()
     ACSR |= _BV(ACI);
 }
 
-__inline void comparDisable() { ACSR &= ~_BV(ACIE); ACSR |= _BV(ACD); }
-__inline void comparEnable() { ACSR &= ~_BV(ACIE) | ~_BV(ACD); }
+__inline void comparDisable() { ACSR |= _BV(ACD); }
+__inline void comparEnable() { ACSR &= ~_BV(ACD); }
 __inline void comparIRQ_On() { ACSR |= _BV(ACIE); }
-__inline uint8_t isItDay() { return (ACSR & _BV(ACO)); }
+__inline volatile uint8_t isItDay() { return !(ACSR & _BV(ACO)); }
 __inline void set_ctcFlag() { GPIOR0 |= _BV(CHEK); }
 __inline void clr_ctcFlag() { GPIOR0 &= ~_BV(CHEK); }
 __inline uint8_t is_ctcFlag() { return (GPIOR0 & _BV(CHEK)); }
@@ -94,9 +94,8 @@ __inline void setupLEDPWM()
 {
     PRR &= ~_BV(PRTIM1);
     clrDelay();
-    //GPIOR0 &= ~BV(MODE);
     TCCR1A = _BV(COM1A1) | _BV(COM1B1) | _BV(WGM10);
-    TCCR1B = _BV(WGM12) | _BV(CS10) | _BV(CS12);
+    TCCR1B = _BV(WGM12) | _BV(CS12);
     OCR1A = OCR1B = 0;
 }
 
@@ -107,19 +106,19 @@ __inline void setupLEDBlink()
     TCCR1B = _BV(WGM12) | _BV(CS12);
     OCR1A = OCR1B = BLINK_TIME;
     setDelay();
-    GPIOR2 = BLINK_DURATION;
+    //GPIOR2 = BLINK_DURATION;
     GPIOR1 = 0;
-    while (GPIOR1 < GPIOR2) wdt_reset();
+    while (GPIOR1 < BLINK_DURATION) wdt_reset();
     clrDelay();
     GPIOR1 = 0;
 }
 
 __inline void setMode(uint8_t md)
 {
-    if((GPIOR2 & _BV(MODE)) != (md << MODE))
+    if((GPIOR0 & _BV(MODE)) != (md << MODE))
     {
         md ? setupLEDBlink() : setupLEDPWM();
-        GPIOR2 ^= _BV(MODE);
+        GPIOR0 ^= _BV(MODE);
     }
 }
 

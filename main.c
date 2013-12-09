@@ -15,6 +15,7 @@ void get_mcusr(void)
   wdt_disable();
 }
 
+
 int main(void)
 {
     void (*state)();
@@ -32,18 +33,22 @@ int main(void)
 
     sei();
 
-    stateChangeDisplay(DELAY_TICKS_STARTUP_DISPLAY);
+    //stateChangeDisplay(DELAY_TICKS_STARTUP_DISPLAY);
 
     while(1)
     {
         if (is_ctcFlag())
         {
             wdt_reset();
+            comparIRQ_Off();
             comparEnable(); //TURN ON AC OPERATION
-            setMode((GPIOR2 < DELAY_TICKS_MIN + 5) ? BLINK_MODE : PWM_MODE);
+            comparIRQ_On();
+            setMode((GPIOR2 < DELAY_TICKS_MIN + 30) ? BLINK_MODE : PWM_MODE);
             cli();
+
             state = (isItDay()) ? &goToSleep : &nothing;    //TEST FOR TWO STATES: NOTHINNG OR TIME TO SLEEP BECAUSE IT'S DAYTIME
             state();
+            comparIRQ_Off();
             comparDisable();  //TURN OFF AC UNTIL NEXT CTC ON TIMER0
         }
     }
@@ -97,7 +102,9 @@ void stateChangeDisplay(uint8_t delayTime)
 
 ISR(ANA_COMP_vect)
 {
-    comparIRQ_Off();
+    //comparIRQ_Off();
+    //if (!isItDay()) state = &goToSleep;
+    //else state = &nothing;
 }
 
 ISR(TIM0_COMPA_vect)
@@ -120,7 +127,7 @@ ISR(TIM0_COMPA_vect)
             if (OCR1A > LOW_DUTY) decDuty();
             else
             {
-                GPIOR2 = (rand() / ((RAND_MAX / DELAY_TICKS_MAX + 1)) + DELAY_TICKS_MIN); //GENERATE AND STORE RANDOM PAUSE BETWEEN FADE OUT/IN
+                GPIOR2 = (rand() / ((RAND_MAX / DELAY_TICKS_MAX + 1)) + DELAY_TICKS_MIN)*2; //GENERATE AND STORE RANDOM PAUSE BETWEEN FADE OUT/IN
                 setFadeIn();
                 setDelay();
                 OCR1A = OCR1B = 0;
