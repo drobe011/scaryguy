@@ -8,21 +8,20 @@
 #include <stdlib.h>
 //#include <avr/iotn84a.h>
 
-#define LOW_DUTY 20
+#define LOW_DUTY 1
 #define HIGH_DUTY 220
 #define DELAY_TICKS_MIN 20
 #define DELAY_TICKS_MAX 100 - DELAY_TICKS_MIN
 #define DELAY_TICKS_STARTUP_DISPLAY 50
 #define BLINK_HZ 4
 #define BLINK_TIME (F_CPU/(512 * BLINK_HZ)) - 1
-#define BLINK_DURATION 100 //10s ms
+#define BLINK_DURATION 10
 #define FDIR 0
 #define CHEK 1
 #define DELY 2
-#define MODE 3
-#define LMDE 4
-#define PWM_MODE 0
-#define BLINK_MODE 1
+
+
+volatile uint8_t blinkCounter;
 
 __inline void setupTimer0()
 {
@@ -61,12 +60,9 @@ __inline void shutOffTimer0()
     PRR |= _BV(PRTIM0);
 }
 
-__inline uint8_t isPWM() { return !(GPIOR0 & _BV(MODE)); }
-
 __inline void setupADC()
 {
-    ACSR |= _BV(ACIE); // | _BV(ACIS1) | _BV(ACIS1);
-    DIDR0 = _BV(ADC1D) | _BV(ADC2D);
+    ACSR |= _BV(ACIE);
 }
 
 __inline void comparIRQ_Off()
@@ -101,29 +97,18 @@ __inline void setupLEDPWM()
 
 __inline void setupLEDBlink()
 {
+    TIMSK0 = 0;
     OCR1A = OCR1B = 0;
     TCCR1A = _BV(COM1A0) | _BV(COM1B0);
     TCCR1B = _BV(WGM12) | _BV(CS12);
+    TIMSK1 = _BV(OCIE1A);
     OCR1A = OCR1B = BLINK_TIME;
-    setDelay();
-    //GPIOR2 = BLINK_DURATION;
-    GPIOR1 = 0;
-    while (GPIOR1 < BLINK_DURATION) wdt_reset();
-    clrDelay();
-    GPIOR1 = 0;
-}
-
-__inline void setMode(uint8_t md)
-{
-    if((GPIOR0 & _BV(MODE)) != (md << MODE))
-    {
-        md ? setupLEDBlink() : setupLEDPWM();
-        GPIOR0 ^= _BV(MODE);
-    }
+    blinkCounter = 0;
+    while (blinkCounter < BLINK_DURATION) { asm ("nop"); wdt_reset(); }
+    TIMSK1 = 0;
+    TIMSK0 = _BV(OCIE0A);
 }
 
 void goToSleep();
 void nothing();
-void delayNflash(uint8_t, uint8_t, uint8_t);
-void stateChangeDisplay(uint8_t);
 #endif // DEFS_H_INCLUDED
